@@ -1,4 +1,3 @@
-# chat_secure_guard — Complete Package Documentation
 
 ## 1. Overview
 chat_secure_guard is a Flutter package that provides:
