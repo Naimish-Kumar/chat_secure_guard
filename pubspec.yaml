@@ -1,8 +1,8 @@
 name: chat_secure_guard
 description: A complete Flutter package for End-to-End Encryption (E2EE), secure file encryption, and key management using libsodium.
 version: 0.0.1
-homepage: https://github.com/example/chat_secure_guard
-repository: https://github.com/example/chat_secure_guard
+homepage: https://github.com/Naimish-Kumar/chat_secure_guard
+repository: https://github.com/Naimish-Kumar/chat_secure_guard
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
