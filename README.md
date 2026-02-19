@@ -1,121 +1,120 @@
 
-## 1. Overview
-chat_secure_guard is a Flutter package that provides:
-- ✅ End-to-End Encryption (E2EE) for messages
-- ✅ Secure file encryption & decryption
-- ✅ Public/Private key generation
-- ✅ Secure local storage support
-- ✅ Easy integration API for chat apps
+## Overview
+`chat_secure_guard` is a production-grade Flutter package for **End-to-End Encryption (E2EE)**. It provides military-grade security using **libsodium** and now supports the **Double Ratchet Algorithm** (used by Signal & WhatsApp) for Perfect Forward Secrecy.
 
-The goal is to allow developers to add WhatsApp-like encryption to their Flutter apps with minimal effort.
+It is designed to work seamlessly with its counterpart: `chat-secure-guard-js` (for Web/Node/React Native).
 
-## 2. Features
-- 🔐 **Asymmetric Encryption (Public/Private Keys)**
-- 🔑 **Secure Key Pair Generation**
-- 💬 **Message Encryption & Decryption**
-- 📁 **File Encryption Support**
-- 🗄 **Secure Local Storage**
-- ⚡ **Lightweight API**
-- 📱 **Android / iOS Support**
-- 🔄 **Session Key Support (Optional Advanced)**
+## Features
+- 🔐 **End-to-End Encryption**: Messages are encrypted on the device and can only be read by the intended recipient.
+- 🔄 **Double Ratchet Algorithm**: Rotates keys for every message. If a key is compromised, past and future messages remain secure.
+- 🔑 **Secure Key Management**: Automated generation and storage of ED25519 keys.
+- 📁 **File Encryption**: Securely encrypt and decrypt files (images, videos, docs).
+- ⚡ **Cross-Platform**: Fully compatible with Android, iOS, Web, Windows, macOS, and Linux.
 
-## 3. Technology Stack
-Recommended libraries:
-- **Encryption**: libsodium (via `sodium` package)
-- **Secure Storage**: `flutter_secure_storage`
-- **Hashing**: `crypto`
-- **File Handling**: `dart:io`
+## Installation
 
-## 4. Installation
+Add to `pubspec.yaml`:
 
-Add in `pubspec.yaml`:
 ```yaml
 dependencies:
-  flutter:
-    sdk: flutter
-  sodium: ^2.0.0
-  flutter_secure_storage: ^9.0.0
-  crypto: ^3.0.3
+  chat_secure_guard: ^0.0.2
 ```
 
-## 5. Usage
+> **Note:** This package automatically includes `flutter_secure_storage` and `sodium_libs`.
+> However, for `flutter_secure_storage` on Android, you might need to set `minSdkVersion` to 18 in your `android/app/build.gradle`.
 
-### Initialization
-Initialize the package before use, typically in `main()` or your app startup logic. This generates keys if they don't exist.
+## Usage
+
+### 1. Initialization
+Initialize the library at the start of your app. This generates Identity Keys if they don't exist.
 
 ```dart
 await ChatSecureGuard.init();
 ```
 
-### Retrieving Public Key
-Get the current user's public key to share with others.
+### 2. Double Ratchet (WhatsApp-style Encryption) 🚀 *Recommended*
 
+This is the most secure way to chat. It handles key rotation automatically.
+
+#### Step A: Setup Sessions
+You need a "Shared Secret" to start a session. This is usually derived from an initial Key Exchange (X3DH) or simply by exchanging public keys via your server.
+
+**Sender (Alice):**
 ```dart
-final publicKey = await ChatSecureGuard.getPublicKey();
+// 1. Get Sodium Instance
+final sodium = ChatSecureGuard.sodium;
+final ratchet = DoubleRatchet(sodium);
+
+// 2. Initialize Sender Session
+// 'sharedSecret': A 32-byte key you agreed upon (via server/QR code)
+// 'bobPublicKey': Bob's Identity Public Key
+final aliceSession = ratchet.initSenderSession(sharedSecret, bobPublicKey);
 ```
 
-### Message Encryption
-Encrypt a message using the recipient's public key.
+**Receiver (Bob):**
+```dart
+// 1. Get Sodium Instance
+final sodium = ChatSecureGuard.sodium;
+final ratchet = DoubleRatchet(sodium);
+
+// 2. Initialize Receiver Session
+// 'bobRatchetKeyPair': The key pair Bob published to the server (PreKey)
+final bobSession = ratchet.initReceiverSession(sharedSecret, bobRatchetKeyPair);
+```
+
+#### Step B: Send Message
+```dart
+final packet = ratchet.encrypt(aliceSession, "Hello Secure World!");
+
+// 'packet' is a Map containing:
+// - header_key: The new ratchet public key
+// - nonce: Random nonce
+// - ciphertext: The encrypted message
+// Send this whole packet to Bob via your server.
+```
+
+#### Step C: Receive Message
+```dart
+// Bob receives 'packet' from server
+final message = ratchet.decrypt(bobSession, packet);
+print(message); // "Hello Secure World!"
+```
+
+### 3. Basic Encryption (Legacy / Stateless)
+Simple Public/Private key encryption without session management.
 
 ```dart
+// Encrypt
 final encrypted = await ChatSecureGuard.encrypt(
-  message: "Hello Secure World",
-  receiverPublicKey: receiverPublicKey, // Uint8List
+  message: "Secret!",
+  receiverPublicKey: otherUserPublicKey,
 );
-```
 
-### Message Decryption
-Decrypt a received message using the sender's public key.
-
-```dart
+// Decrypt
 final decrypted = await ChatSecureGuard.decrypt(
-  encryptedMessage: encryptedString,
-  senderPublicKey: senderPublicKey, // Uint8List
+  encryptedMessage: encrypted,
+  senderPublicKey: senderPublicKey,
 );
 ```
 
-### File Encryption
-Encrypt a file with a symmetric key.
+### 4. File Encryption
+Encrypt unread raw files before uploading them.
 
 ```dart
+// Encrypt
 final encryptedFile = await ChatSecureGuard.encryptFile(
-  file: myFile,
-  key: symmetricKey, // Uint8List
+  file: File('image.png'),
+  key: symmetricKey,
 );
-```
 
-### File Decryption
-Decrypt a file using the same symmetric key.
-
-```dart
-final decryptedFile = await ChatSecureGuard.decryptFile(
+// Decrypt
+final originalFile = await ChatSecureGuard.decryptFile(
   file: encryptedFile,
-  key: symmetricKey, // Uint8List
+  key: symmetricKey,
 );
 ```
 
-## 6. Architecture
-**Layer Architecture:**
-App Layer → Dart API Layer (chat_secure_guard) → Crypto Engine (libsodium) → Secure Storage
-
-**Modules:**
-- **Key Manager**: Handles key generation and secure storage.
-- **Encryption Engine**: Handles message crypto.
-- **File Encryption**: Handles file crypto.
-- **Storage Manager**: Wrapper for secure storage.
-- **Public API**: Facade for easy integration.
-
-## 7. Security Best Practices
-- ✅ Use nonce for every message (handled automatically).
-- ✅ Never reuse keys incorrectly.
-- ✅ Store private keys securely (handled via FlutterSecureStorage).
-- ✅ Use forward secrecy (advanced feature).
-- ✅ Rotate session keys periodically.
-
-## 8. Sending Encrypted Chat Flow
-1. **User A**: Encrypt with User B's Public Key → Send to Server.
-2. **Server**: Stores encrypted message only (cannot read it).
-3. **User B**: Receive → Decrypt with Private Key.
-
-## 9. File Sharing Flow
-Select File → Encrypt File → Upload Encrypted File → Receiver Download → Decrypt File.
+## Security Design
+*   **Algorithm**: X25519 for Key Exchange, XSalsa20-Poly1305 for Encryption, BLAKE2b for KDF.
+*   **Storage**: Keys are stored in Android Keystore / iOS Keychain via `flutter_secure_storage`.
+*   **Safety**: Uses `sodium_libs` FFI bindings for high performance and security.

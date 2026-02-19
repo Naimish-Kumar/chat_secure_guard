@@ -12,6 +12,7 @@ export 'src/models.dart';
 export 'src/key_manager.dart';
 export 'src/encryption_service.dart';
 export 'src/file_crypto.dart';
+export 'src/double_ratchet.dart'; // Export new Double Ratchet implementation
 
 class ChatSecureGuard {
   static final KeyManager _keyManager = KeyManager();
@@ -43,6 +44,9 @@ class ChatSecureGuard {
     }
     return _sodium!;
   }
+
+  /// Returns the internal Sodium instance (for advanced usage like DoubleRatchet).
+  static Sodium get sodium => _sodiumInstance;
 
   /// Regenerate keys. This invalidates all previous messages efficiently.
   static Future<void> regenerateKeys() async {
